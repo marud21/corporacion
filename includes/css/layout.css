@@ -1,0 +1,210 @@
+/* Estilos generales para el layout */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #f8f9fa;
+}
+
+/* Estilos para el header */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem 1rem;
+    background-color: #fff;
+    z-index: 1030; /* Asegura que el header esté por encima del sidebar */
+}
+
+.navbar-brand {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.navbar-brand img {
+    height: 40px;
+    margin-right: 10px;
+}
+
+/* Estilos para el sidebar */
+#sidebar {
+    min-width: 250px;
+    max-width: 250px;
+    background: #343a40;
+    color: #fff;
+    transition: all 0.3s;
+    min-height: calc(100vh - 56px); /* Ajusta según la altura del header */
+    position: fixed;
+    top: 56px; /* Altura del navbar */
+    left: 0;
+    overflow-y: auto;
+    z-index: 1020;
+}
+
+#sidebar.active {
+    margin-left: -250px;
+}
+
+#sidebar .sidebar-header {
+    padding: 20px;
+    background: #2c3136;
+}
+
+#sidebar ul.components {
+    padding: 20px 0;
+}
+
+#sidebar ul li a {
+    padding: 10px 20px;
+    font-size: 1em;
+    display: block;
+    color: #adb5bd;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+#sidebar ul li a:hover {
+    color: #fff;
+    background: #495057;
+}
+
+#sidebar ul li.active > a {
+    color: #fff;
+    background: #007bff;
+}
+
+#sidebar ul li a i {
+    margin-right: 10px;
+}
+
+/* Contenido principal */
+#content {
+    width: 100%;
+    padding: 20px;
+    min-height: calc(100vh - 56px);
+    margin-left: 250px;
+    transition: all 0.3s;
+}
+
+#content.active {
+    margin-left: 0;
+}
+
+/* Estilos para el footer */
+.footer {
+    background-color: #343a40;
+    color: #fff;
+    padding: 1.5rem 0;
+    margin-top: auto;
+    width: 100%;
+}
+
+.footer a {
+    color: #6c757d;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.footer a:hover {
+    color: #fff;
+    text-decoration: none;
+}
+
+.footer .social-links a {
+    display: inline-block;
+    width: 36px;
+    height: 36px;
+    background-color: #495057;
+    color: #fff;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 36px;
+    margin-right: 10px;
+    transition: all 0.3s;
+}
+
+.footer .social-links a:hover {
+    background-color: #007bff;
+    color: #fff;
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+    #sidebar {
+        margin-left: -250px;
+    }
+    #sidebar.active {
+        margin-left: 0;
+    }
+    #content {
+        width: 100%;
+        margin-left: 0;
+    }
+    #content.active {
+        margin-left: 250px;
+    }
+}
+
+/* Estilos para el botón de toggle del sidebar */
+#sidebarCollapse {
+    background: none;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+}
+
+#sidebarCollapse:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+#sidebarCollapse span {
+    display: block;
+    width: 25px;
+    height: 2px;
+    background-color: #000;
+    margin: 5px 0;
+    transition: all 0.3s;
+}
+
+/* Estilos para el dropdown del usuario */
+.user-dropdown .dropdown-toggle::after {
+    display: none;
+}
+
+.user-dropdown .dropdown-menu {
+    left: auto;
+    right: 0;
+}
+
+/* Estilos para las tarjetas */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+}
+
+/* Personalización de la barra de desplazamiento */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

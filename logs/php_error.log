@@ -1,0 +1,22 @@
+[15-Jun-2025 00:56:53 Europe/Berlin] Error en SocioController::store: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'fecha_afiliacion' in 'field list'
+[15-Jun-2025 00:56:53 Europe/Berlin] [2025-06-15 00:56:53] PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'fecha_afiliacion' in 'field list' en C:\xampp\htdocs\corve\controllers\socio_controller.php línea 251
+[15-Jun-2025 00:56:53 Europe/Berlin] PHP Fatal error:  Uncaught TypeError: http_response_code(): Argument #1 ($response_code) must be of type int, string given in C:\xampp\htdocs\corve\controllers\socio_controller.php:484
+Stack trace:
+#0 C:\xampp\htdocs\corve\controllers\socio_controller.php(484): http_response_code('42S22')
+#1 C:\xampp\htdocs\corve\controllers\socio_controller.php(622): sendJsonResponse(false, 'SQLSTATE[42S22]...', Array, '42S22')
+#2 {main}
+  thrown in C:\xampp\htdocs\corve\controllers\socio_controller.php on line 484
+[15-Jun-2025 01:12:07 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$nombre is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 106
+[15-Jun-2025 01:12:07 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$documento is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 107
+[15-Jun-2025 01:12:07 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$email is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 108
+[15-Jun-2025 01:12:07 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$telefono is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 109
+[15-Jun-2025 01:12:07 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$direccion is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 110
+[15-Jun-2025 01:12:07 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$fecha_nacimiento is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 111
+[15-Jun-2025 01:12:11 Europe/Berlin] [2025-06-15 01:12:11] Exception: Se requiere el ID del socio en C:\xampp\htdocs\corve\controllers\socio_controller.php línea 560
+[15-Jun-2025 01:12:11 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$nombre is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 106
+[15-Jun-2025 01:12:11 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$documento is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 107
+[15-Jun-2025 01:12:11 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$email is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 108
+[15-Jun-2025 01:12:11 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$telefono is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 109
+[15-Jun-2025 01:12:11 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$direccion is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 110
+[15-Jun-2025 01:12:11 Europe/Berlin] PHP Deprecated:  Creation of dynamic property Socio::$fecha_nacimiento is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 111
+[15-Jun-2025 01:12:11 Europe/Berlin] PHP Deprecated:  strip_tags(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\corve\models\Socio.php on line 145
