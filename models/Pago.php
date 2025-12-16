@@ -130,5 +130,43 @@ class Pago {
         }
         return 0;
     }
+    
+    /**
+     * Inserta un nuevo pago en la base de datos y descuenta el monto del saldo del socio
+     * @param array $data
+     * @return int ID del pago insertado
+     */
+    public function create($data) {
+        $this->db->beginTransaction();
+        try {
+            $query = "INSERT INTO pagos (socio_id, monto, concepto, fecha, metodo_pago, referencia, observaciones) VALUES (:socio_id, :monto, :concepto, :fecha, :metodo_pago, :referencia, :observaciones)";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(':socio_id', $data['socio_id'], PDO::PARAM_INT);
+            $stmt->bindParam(':monto', $data['monto']);
+            $stmt->bindParam(':concepto', $data['concepto']);
+            $fecha = isset($data['fecha']) ? $data['fecha'] : date('Y-m-d H:i:s');
+            $stmt->bindParam(':fecha', $fecha);
+            $metodo_pago = isset($data['metodo_pago']) ? $data['metodo_pago'] : 'efectivo';
+            $stmt->bindParam(':metodo_pago', $metodo_pago);
+            $referencia = isset($data['referencia']) ? $data['referencia'] : null;
+            $stmt->bindParam(':referencia', $referencia);
+            $observaciones = isset($data['observaciones']) ? $data['observaciones'] : null;
+            $stmt->bindParam(':observaciones', $observaciones);
+            $stmt->execute();
+            $pago_id = $this->db->lastInsertId();
+
+            // Restar el monto del saldo del socio
+            $update = $this->db->prepare("UPDATE socios SET saldo = saldo - :monto WHERE id = :socio_id");
+            $update->bindParam(':monto', $data['monto']);
+            $update->bindParam(':socio_id', $data['socio_id'], PDO::PARAM_INT);
+            $update->execute();
+
+            $this->db->commit();
+            return $pago_id;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
 }
 ?>

@@ -1,10 +1,19 @@
 <?php
 // Configuración de encabezados para JSON
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+
+// Manejar preflight requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
 // Incluir el modelo de Pago
 require_once __DIR__ . '/../models/Pago.php';
-require_once __DIR__ . '/Database.php';
+require_once __DIR__ . '/../includes/database/Database.php';
 
 // Obtener la conexión a la base de datos
 $database = new Database();
@@ -45,10 +54,21 @@ try {
             
         case 'POST':
             // Obtener los datos del pago del cuerpo de la petición
-            $data = json_decode(file_get_contents('php://input'), true);
+            $input = file_get_contents('php://input');
+            $data = json_decode($input, true);
+            
+            // Debug logging
+            error_log('[PAGO_CONTROLLER] Método: POST');
+            error_log('[PAGO_CONTROLLER] Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'no definido'));
+            error_log('[PAGO_CONTROLLER] Input recibido: ' . substr($input, 0, 200));
+            error_log('[PAGO_CONTROLLER] Datos parseados: ' . json_encode($data));
+            
+            if (!is_array($data)) {
+                throw new Exception('Formato JSON inválido. Asegúrate de enviar Content-Type: application/json');
+            }
             
             if (empty($data['socio_id']) || empty($data['monto']) || empty($data['concepto'])) {
-                throw new Exception('Faltan campos obligatorios');
+                throw new Exception('Faltan campos obligatorios: socio_id, monto, concepto');
             }
             
             // Validar monto
@@ -76,14 +96,16 @@ try {
             break;
             
         default:
-            http_response_code(405); // Método no permitido
+            http_response_code(405);
             $response['message'] = 'Método no permitido';
             break;
     }
 } catch (Exception $e) {
     http_response_code(500);
+    $response['success'] = false;
     $response['message'] = 'Error: ' . $e->getMessage();
-    error_log('Error en pago_controller: ' . $e->getMessage());
+    error_log('[PAGO_CONTROLLER] Error capturado: ' . $e->getMessage());
+    error_log('[PAGO_CONTROLLER] Stack: ' . $e->getTraceAsString());
 }
 
 // Enviar la respuesta como JSON
