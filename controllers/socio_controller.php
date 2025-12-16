@@ -37,6 +37,145 @@ if (!is_writable($logDir)) {
     chmod($logDir, 0777);
 }
 
+/**
+ * Procesar carga de archivo de documento
+ * @param string $documento Número de documento del socio
+ * @return string|null Ruta del archivo guardado o null si es actualización sin foto
+ */
+function procesarFotoDocumento($documento, $esActualizacion = false) {
+    // Si es actualización y no hay archivo, retornar null
+    if ($esActualizacion && (!isset($_FILES['foto_documento']) || $_FILES['foto_documento']['error'] === UPLOAD_ERR_NO_FILE)) {
+        error_log('[UPLOAD] Actualización sin foto, retornando null');
+        return null;
+    }
+    
+    // Validar que exista el archivo
+    if (!isset($_FILES['foto_documento'])) {
+        throw new Exception('No se recibió archivo de foto', 400);
+    }
+    
+    $archivo = $_FILES['foto_documento'];
+    
+    // Validar errores de carga
+    if ($archivo['error'] !== UPLOAD_ERR_OK) {
+        $mensajeError = 'Error desconocido al cargar archivo';
+        switch ($archivo['error']) {
+            case UPLOAD_ERR_INI_SIZE:
+                $mensajeError = 'Archivo excede el límite de php.ini';
+                break;
+            case UPLOAD_ERR_FORM_SIZE:
+                $mensajeError = 'Archivo excede el límite del formulario';
+                break;
+            case UPLOAD_ERR_PARTIAL:
+                $mensajeError = 'El archivo se cargó parcialmente';
+                break;
+            case UPLOAD_ERR_NO_TMP_DIR:
+                $mensajeError = 'No hay directorio temporal en el servidor';
+                break;
+            case UPLOAD_ERR_CANT_WRITE:
+                $mensajeError = 'No se puede escribir en el disco';
+                break;
+            case UPLOAD_ERR_EXTENSION:
+                $mensajeError = 'Extensión de archivo bloqueada por PHP';
+                break;
+        }
+        throw new Exception($mensajeError, 400);
+    }
+    
+    error_log('[UPLOAD] Archivo recibido: ' . $archivo['name'] . ', Tamaño: ' . $archivo['size'] . ', Tmp: ' . $archivo['tmp_name']);
+    
+    // Verificar que el archivo temporal exista
+    if (!file_exists($archivo['tmp_name'])) {
+        error_log('[UPLOAD] ERROR: Archivo temporal no existe: ' . $archivo['tmp_name']);
+        throw new Exception('El archivo temporal se perdió. Intenta nuevamente', 500);
+    }
+    
+    // Validar extensión
+    $extensionesPermitidas = ['jpg', 'jpeg', 'png', 'gif'];
+    $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+    
+    if (!in_array($extension, $extensionesPermitidas)) {
+        throw new Exception('Tipo de archivo no permitido. Solo JPG, PNG o GIF', 400);
+    }
+    
+    error_log('[UPLOAD] Extensión válida: ' . $extension);
+    
+    // Validar tamaño (5MB máximo)
+    $maxSize = 5 * 1024 * 1024;
+    if ($archivo['size'] > $maxSize) {
+        throw new Exception('El archivo excede el tamaño máximo permitido (5MB)', 400);
+    }
+    
+    // Crear directorio si no existe
+    $uploadDir = __DIR__ . '/../uploads/documentos';
+    
+    if (!is_dir($uploadDir)) {
+        error_log('[UPLOAD] Creando directorio: ' . $uploadDir);
+        if (!@mkdir($uploadDir, 0777, true)) {
+            throw new Exception('No se pudo crear el directorio de uploads', 500);
+        }
+    }
+    
+    // Asegurar permisos
+    @chmod($uploadDir, 0777);
+    
+    if (!is_writable($uploadDir)) {
+        error_log('[UPLOAD] ERROR: Directorio no escribible: ' . $uploadDir);
+        throw new Exception('El directorio de uploads no tiene permisos de escritura', 500);
+    }
+    
+    error_log('[UPLOAD] Directorio listo: ' . $uploadDir);
+    
+    // Generar nombre único
+    $nombreArchivo = 'doc_' . $documento . '_' . time() . '_' . uniqid() . '.' . $extension;
+    $rutaDestino = $uploadDir . '/' . $nombreArchivo;
+    
+    error_log('[UPLOAD] Destino: ' . $rutaDestino);
+    
+    // Intentar mover/copiar archivo
+    $exito = false;
+    $tmpExistiaAntes = file_exists($archivo['tmp_name']);
+    
+    // Primero intentar move_uploaded_file (si es archivo HTTP)
+    if (is_uploaded_file($archivo['tmp_name'])) {
+        error_log('[UPLOAD] Usando move_uploaded_file');
+        $exito = @move_uploaded_file($archivo['tmp_name'], $rutaDestino);
+        if ($exito) {
+            error_log('[UPLOAD] move_uploaded_file éxito');
+        } else {
+            error_log('[UPLOAD] move_uploaded_file falló');
+        }
+    }
+    
+    // Si falla, usar copy (solo si el archivo temporal aún existe)
+    if (!$exito && $tmpExistiaAntes && file_exists($archivo['tmp_name'])) {
+        error_log('[UPLOAD] Intentando copy');
+        $exito = @copy($archivo['tmp_name'], $rutaDestino);
+        if ($exito) {
+            error_log('[UPLOAD] Copy éxito, limpiando temporal');
+            @unlink($archivo['tmp_name']);
+        } else {
+            error_log('[UPLOAD] Copy falló');
+        }
+    }
+    
+    if (!$exito) {
+        error_log('[UPLOAD] ERROR: No se pudo guardar archivo.');
+        throw new Exception('Error al guardar el archivo en el servidor', 500);
+    }
+    
+    // Verificar que se guardó (solo verificar destino, no el temporal que ya fue movido)
+    if (!file_exists($rutaDestino)) {
+        error_log('[UPLOAD] ERROR: Archivo no existe después de guardar: ' . $rutaDestino);
+        throw new Exception('El archivo no se guardó correctamente', 500);
+    }
+    
+    $rutaRelativa = 'uploads/documentos/' . $nombreArchivo;
+    error_log('[UPLOAD] ÉXITO: Archivo guardado en ' . $rutaRelativa . ', tamaño: ' . filesize($rutaDestino));
+    
+    return $rutaRelativa;
+}
+
 class SocioController {
     private $socioModel;
     private $database;
@@ -139,6 +278,7 @@ class SocioController {
                 'telefono' => $this->socioModel->telefono,
                 'direccion' => $this->socioModel->direccion,
                 'fecha_nacimiento' => $this->socioModel->fecha_nacimiento,
+                'fecha_afiliacion' => $datosSocio['fecha_afiliacion'] ?? null,
                 'entidad_salud' => $datosSocio['entidad_salud'] ?? null,
                 'documento_pdf' => $datosSocio['documento_pdf'] ?? null,
                 'afiliado' => (bool)($datosSocio['afiliado'] ?? false),
@@ -174,6 +314,21 @@ class SocioController {
                 if (empty(trim($data[$campo] ?? ''))) {
                     throw new Exception("El campo $campo es obligatorio", 400);
                 }
+            }
+            
+            // Procesar archivo de documento (OBLIGATORIO)
+            $documento_pdf = null;
+            
+            // Si ya fue procesada en el controlador (desde POST FormData), usar ese valor
+            if (!empty($data['documento_pdf'])) {
+                $documento_pdf = $data['documento_pdf'];
+                error_log('[STORE] Usando documento_pdf ya procesado: ' . $documento_pdf);
+            } elseif (isset($_FILES['foto_documento'])) {
+                // Si no está procesada pero existe el archivo, procesarla ahora
+                $documento_pdf = procesarFotoDocumento($data['documento']);
+                error_log('[STORE] Procesando documento_pdf nuevo');
+            } else {
+                throw new Exception("La foto del documento de identidad es obligatoria", 400);
             }
             
             // Validar documento único
@@ -236,25 +391,41 @@ class SocioController {
             $stmt_socio = $conn->prepare($query_socio);
             
             $entidad_salud = trim($data['entidad_salud'] ?? '');
-            $documento_pdf = $data['documento_pdf'] ?? null;
             $afiliado = isset($data['afiliado']) ? 1 : 0;
-            $saldo = floatval($data['saldo'] ?? 0);
             $fecha_afiliacion = $data['fecha_afiliacion'] ?? date('Y-m-d');
-            
+
+            // Calcular el valor de la mensualidad proporcional según la fecha de afiliación
+            $primerMonto = 45000;
+            $diaAfiliacion = (int)date('j', strtotime($fecha_afiliacion));
+            if ($diaAfiliacion <= 7) {
+                $primerMonto = 45000;
+            } elseif ($diaAfiliacion <= 21) {
+                $primerMonto = 22500;
+            } else {
+                $primerMonto = 11250;
+            }
+            // Sumar afiliación, inscripción y mensualidad proporcional al saldo inicial
+            $cuota_afiliacion = isset($data['cuota_afiliacion']) ? floatval($data['cuota_afiliacion']) : 100000;
+            $cuota_inscripcion = isset($data['cuota_inscripcion']) ? floatval($data['cuota_inscripcion']) : 45000;
+            $saldo = $cuota_afiliacion + $cuota_inscripcion + $primerMonto;
+
             $stmt_socio->bindParam(":id", $usuario_id);
             $stmt_socio->bindParam(":entidad_salud", $entidad_salud);
             $stmt_socio->bindParam(":documento_pdf", $documento_pdf);
             $stmt_socio->bindParam(":afiliado", $afiliado, PDO::PARAM_INT);
             $stmt_socio->bindParam(":saldo", $saldo);
             $stmt_socio->bindParam(":fecha_afiliacion", $fecha_afiliacion);
-            
+
             if(!$stmt_socio->execute()) {
                 throw new Exception("Error al crear el registro del socio: " . implode(", ", $stmt_socio->errorInfo()));
             }
-            
+
             // Si todo salió bien, confirmar la transacción
             $conn->commit();
-            
+
+            // Eliminar el registro de pago inicial: NO insertar ningún pago en la tabla pagos
+            // El saldo inicial ya incluye la mensualidad proporcional
+
             return $usuario_id;
             
         } catch (PDOException $e) {
@@ -299,16 +470,22 @@ class SocioController {
                 throw new Exception("No se encontró el socio con ID: $id", 404);
             }
             
-            // Validar documento único (si se está actualizando)
+            // Validar documento único (si se está actualizando y el documento cambió)
             if (!empty($data['documento'])) {
-                $queryCheck = "SELECT id FROM usuarios WHERE documento = :documento AND id != :id";
-                $stmtCheck = $conn->prepare($queryCheck);
-                $stmtCheck->bindParam(':documento', $data['documento']);
-                $stmtCheck->bindParam(':id', $id, PDO::PARAM_INT);
-                $stmtCheck->execute();
+                // Obtener el documento actual del socio
+                $currentDoc = $this->socioModel->documento;
                 
-                if ($stmtCheck->rowCount() > 0) {
-                    throw new Exception("Ya existe otro usuario con este documento", 409);
+                // Solo validar si el documento es diferente al actual
+                if ($data['documento'] !== $currentDoc) {
+                    $queryCheck = "SELECT id FROM usuarios WHERE documento = :documento AND id != :id";
+                    $stmtCheck = $conn->prepare($queryCheck);
+                    $stmtCheck->bindParam(':documento', $data['documento']);
+                    $stmtCheck->bindParam(':id', $id, PDO::PARAM_INT);
+                    $stmtCheck->execute();
+                    
+                    if ($stmtCheck->rowCount() > 0) {
+                        throw new Exception("Ya existe otro usuario con este documento", 409);
+                    }
                 }
             }
             
@@ -347,15 +524,29 @@ class SocioController {
                 throw new Exception("Error al actualizar el usuario");
             }
             
-            // 2. Actualizar los datos específicos del socio (excepto el estado que se maneja aparte)
+            // 2. Actualizar los datos específicos del socio
             $this->socioModel->id = $id;
             $this->socioModel->entidad_salud = $data['entidad_salud'] ?? null;
-            $this->socioModel->documento_pdf = $data['documento_pdf'] ?? null;
+            
+            // Solo actualizar documento_pdf si viene en los datos (no es null implícitamente)
+            if (array_key_exists('documento_pdf', $data)) {
+                $this->socioModel->documento_pdf = $data['documento_pdf'];
+            }
+            
             $this->socioModel->afiliado = isset($data['afiliado']) ? 1 : 0;
             $this->socioModel->saldo = floatval($data['saldo'] ?? 0);
+            $this->socioModel->fecha_afiliacion = $data['fecha_afiliacion'] ?? null;
             
-            // No actualizar el estado aquí, se maneja aparte
-            if(!$this->socioModel->update()) {
+            // Actualizar estado si se proporciona
+            $actualizarEstado = false;
+            if (!empty($data['estado'])) {
+                $this->socioModel->estado = $data['estado'];
+                $this->socioModel->fecha_estado = date('Y-m-d H:i:s');
+                $this->socioModel->motivo_estado = $data['motivo_estado'] ?? null;
+                $actualizarEstado = true;
+            }
+            
+            if(!$this->socioModel->update($actualizarEstado)) {
                 throw new Exception("Error al actualizar los datos del socio");
             }
             
@@ -396,8 +587,8 @@ class SocioController {
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
             
-            // 2. Opcional: Podemos registrar la fecha de baja
-            $queryUpdate = "UPDATE socios SET fecha_baja = NOW() WHERE id = :id";
+            // 2. Cambiar estado a retirado en socios
+            $queryUpdate = "UPDATE socios SET estado = 'retirado', fecha_estado = NOW() WHERE id = :id";
             $stmtUpdate = $conn->prepare($queryUpdate);
             $stmtUpdate->bindParam(':id', $id, PDO::PARAM_INT);
             $stmtUpdate->execute();
@@ -516,13 +707,11 @@ function sendJsonResponse($success, $message, $data = null, $statusCode = 200) {
 try {
     // Configuración inicial
     $method = $_SERVER['REQUEST_METHOD'];
-    $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    $pathParts = explode('/', trim($path, '/'));
     
-    // Obtener el ID si está presente (asumimos la ruta /api/socios[/:id])
+    // Obtener el ID del query string
     $id = null;
-    if (isset($pathParts[2]) && is_numeric($pathParts[2])) {
-        $id = (int)$pathParts[2];
+    if (isset($_GET['id']) && !empty($_GET['id'])) {
+        $id = (int)$_GET['id'];
     }
     
     // Crear instancia del controlador
@@ -546,22 +735,58 @@ try {
             break;
             
         case 'POST':
-            // Crear un nuevo socio
-            // Log de depuración para entrada de datos
-            error_log('[DEBUG] Datos recibidos en POST: ' . file_get_contents('php://input'));
+            // Crear un nuevo socio o actualizar existente (si viene con FormData y foto)
+            // Verificar si es FormData (contiene archivo) o JSON
+            $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
             
-            $jsonInput = file_get_contents('php://input');
-            if (empty($jsonInput)) {
-                throw new Exception('No se recibieron datos para crear el socio', 400);
+            if (strpos($contentType, 'multipart/form-data') !== false) {
+                // Es FormData (contiene archivo)
+                $data = $_POST;
+                error_log('[DEBUG] Datos recibidos en POST (FormData): ' . json_encode($data));
+                
+                // PROCESAR FOTO INMEDIATAMENTE si existe
+                // Esto DEBE hacerse antes de que PHP limpie el archivo temporal
+                if (!empty($_FILES['foto_documento']['tmp_name']) && $_FILES['foto_documento']['error'] === UPLOAD_ERR_OK) {
+                    error_log('[DEBUG] Archivo detectado: ' . $_FILES['foto_documento']['tmp_name']);
+                    
+                    try {
+                        $esActualizacion = !empty($data['action']) && $data['action'] === 'update';
+                        $data['documento_pdf'] = procesarFotoDocumento($data['documento'] ?? '', $esActualizacion);
+                        error_log('[DEBUG] Foto procesada: ' . $data['documento_pdf']);
+                    } catch (Exception $e) {
+                        error_log('[DEBUG] Error al procesar foto: ' . $e->getMessage());
+                        throw $e;
+                    }
+                }
+                
+                // Verificar si es actualización o creación
+                if (!empty($data['action']) && $data['action'] === 'update' && !empty($data['id'])) {
+                    // Es una actualización con FormData
+                    $socioId = (int)$data['id'];
+                    $controller->update($socioId, $data);
+                    sendJsonResponse(true, 'Socio actualizado correctamente');
+                } else {
+                    // Es creación de nuevo socio
+                    $idNuevoSocio = $controller->store($data);
+                    sendJsonResponse(true, 'Socio creado correctamente', ['id' => $idNuevoSocio], 201);
+                }
+            } else {
+                // Es JSON
+                error_log('[DEBUG] Datos recibidos en POST (JSON): ' . file_get_contents('php://input'));
+                
+                $jsonInput = file_get_contents('php://input');
+                if (empty($jsonInput)) {
+                    throw new Exception('No se recibieron datos para crear el socio', 400);
+                }
+                
+                $data = json_decode($jsonInput, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new Exception('Error en el formato JSON: ' . json_last_error_msg(), 400);
+                }
+                
+                $idNuevoSocio = $controller->store($data);
+                sendJsonResponse(true, 'Socio creado correctamente', ['id' => $idNuevoSocio], 201);
             }
-            
-            $data = json_decode($jsonInput, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new Exception('Error en el formato JSON: ' . json_last_error_msg(), 400);
-            }
-            
-            $idNuevoSocio = $controller->store($data);
-            sendJsonResponse(true, 'Socio creado correctamente', ['id' => $idNuevoSocio], 201);
             break;
             
         case 'PUT':
@@ -570,14 +795,28 @@ try {
                 throw new Exception('Se requiere el ID del socio', 400);
             }
             
-            $jsonInput = file_get_contents('php://input');
-            if (empty($jsonInput)) {
-                throw new Exception('No se recibieron datos para actualizar', 400);
-            }
+            // Verificar si es FormData o JSON
+            $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
             
-            $data = json_decode($jsonInput, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new Exception('Error en el formato JSON: ' . json_last_error_msg(), 400);
+            if (strpos($contentType, 'multipart/form-data') !== false) {
+                // Es FormData (contiene archivo)
+                $data = $_POST;
+                
+                // Procesar foto si existe
+                if (!empty($_FILES['foto_documento']['tmp_name'])) {
+                    $data['foto_documento'] = procesarFotoDocumento($_POST['documento'] ?? '', true);
+                }
+            } else {
+                // Es JSON
+                $jsonInput = file_get_contents('php://input');
+                if (empty($jsonInput)) {
+                    throw new Exception('No se recibieron datos para actualizar', 400);
+                }
+                
+                $data = json_decode($jsonInput, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new Exception('Error en el formato JSON: ' . json_last_error_msg(), 400);
+                }
             }
             
             $controller->update($id, $data);

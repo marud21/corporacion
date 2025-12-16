@@ -9,6 +9,7 @@ class Socio {
 
     // Propiedades del socio
     public $id;
+    public $fecha_afiliacion;
     public $entidad_salud;
     public $documento_pdf;
     public $afiliado;
@@ -35,15 +36,15 @@ class Socio {
     }
 
     // Leer todos los socios con sus datos de usuario
-    public function read($soloActivos = false) {
+    public function read($soloActivos = true) {
         $query = "SELECT u.*, s.entidad_salud, s.documento_pdf, s.afiliado, s.saldo, 
                          s.estado, s.fecha_estado, s.motivo_estado
                  FROM " . $this->usuarios_table . " u 
                  LEFT JOIN " . $this->table_name . " s ON u.id = s.id 
-                 WHERE u.rol = 'socio' ";
+                 WHERE u.rol = 'socio' AND u.activo = 1 ";
         
         if ($soloActivos) {
-            $query .= " AND s.estado = '" . self::ESTADO_ACTIVO . "'";
+            $query .= " AND s.estado IN ('" . self::ESTADO_ACTIVO . "', '" . self::ESTADO_LESIONADO . "')";
         }
         
         $query .= " ORDER BY u.nombre ASC";
@@ -66,7 +67,7 @@ class Socio {
 
         // Limpiar los datos
         $this->entidad_salud = htmlspecialchars(strip_tags($this->entidad_salud));
-        $this->documento_pdf = htmlspecialchars(strip_tags($this->documento_pdf));
+        $this->documento_pdf = $this->documento_pdf ?? '';
         $this->afiliado = $this->afiliado ? 1 : 0;
         $this->saldo = (float)$this->saldo;
 
@@ -89,7 +90,8 @@ class Socio {
 
     // Leer un socio específico
     public function readOne() {
-        $query = "SELECT u.*, s.entidad_salud, s.documento_pdf, s.afiliado, s.saldo 
+        $query = "SELECT u.*, s.entidad_salud, s.documento_pdf, s.afiliado, s.saldo, 
+                         s.estado, s.fecha_estado, s.motivo_estado, s.fecha_afiliacion
                  FROM " . $this->usuarios_table . " u 
                  LEFT JOIN " . $this->table_name . " s ON u.id = s.id 
                  WHERE u.id = ? 
@@ -113,6 +115,9 @@ class Socio {
             $this->documento_pdf = $row['documento_pdf'];
             $this->afiliado = $row['afiliado'];
             $this->saldo = $row['saldo'];
+            $this->estado = $row['estado'] ?? 'activo';
+            $this->fecha_estado = $row['fecha_estado'];
+            $this->motivo_estado = $row['motivo_estado'];
             
             return true;
         }
@@ -127,7 +132,8 @@ class Socio {
                  SET entidad_salud = :entidad_salud, 
                      documento_pdf = :documento_pdf, 
                      afiliado = :afiliado, 
-                     saldo = :saldo";
+                     saldo = :saldo,
+                     fecha_afiliacion = :fecha_afiliacion";
         
         // Solo actualizar los campos de estado si se indica explícitamente
         if ($actualizarEstado) {
@@ -141,16 +147,22 @@ class Socio {
         $stmt = $this->conn->prepare($query);
 
         // Limpiar los datos
-        $this->entidad_salud = htmlspecialchars(strip_tags($this->entidad_salud));
-        $this->documento_pdf = htmlspecialchars(strip_tags($this->documento_pdf));
+        $this->entidad_salud = htmlspecialchars(strip_tags($this->entidad_salud ?? ''));
+        // NO sanitizar documento_pdf - es una ruta de archivo y necesita los slashes
+        // Solo asegurar que no sea null
+        $this->documento_pdf = $this->documento_pdf ?? '';
         $this->afiliado = $this->afiliado ? 1 : 0;
         $this->saldo = (float)$this->saldo;
+
+        // Preparar fecha_afiliacion (puede ser null)
+        $fecha_afiliacion = $this->fecha_afiliacion ?? null;
 
         // Vincular los valores
         $stmt->bindParam(":entidad_salud", $this->entidad_salud);
         $stmt->bindParam(":documento_pdf", $this->documento_pdf);
         $stmt->bindParam(":afiliado", $this->afiliado);
         $stmt->bindParam(":saldo", $this->saldo);
+        $stmt->bindParam(":fecha_afiliacion", $fecha_afiliacion);
         
         // Vincular parámetros de estado solo si se están actualizando
         if ($actualizarEstado) {
